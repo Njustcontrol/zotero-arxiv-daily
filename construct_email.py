@@ -117,28 +117,58 @@ def get_stars(score:float):
         return '<div class="star-wrapper">'+full_star * full_star_num + half_star * half_star_num + '</div>'
 
 
-def render_email(papers:list[ArxivPaper]):
+# --- 用下面的代码替换掉你现有的整个 render_email 函数 ---
+def render_email(papers: list[ArxivPaper]):
     parts = []
-    if len(papers) == 0 :
+    if len(papers) == 0:
         return framework.replace('__CONTENT__', get_empty_html())
-    
-    for p in tqdm(papers,desc='Rendering Email'):
-        rate = get_stars(p.score)
-        authors = [a.name for a in p.authors[:5]]
-        authors = ', '.join(authors)
-        if len(p.authors) > 5:
-            authors += ', ...'
-        if p.affiliations is not None:
-            affiliations = p.affiliations[:5]
-            affiliations = ', '.join(affiliations)
-            if len(p.affiliations) > 5:
-                affiliations += ', ...'
-        else:
-            affiliations = 'Unknown Affiliation'
-        parts.append(get_block_html(p.title, authors,rate,p.arxiv_id ,p.tldr, p.pdf_url, p.code_url, affiliations))
+
+    print("开始渲染邮件内容，将逐一处理每篇论文...")
+    for p in tqdm(papers, desc='Rendering Email'):
+        try:
+            # 将对单篇论文的所有处理逻辑，全部放入 try 块中
+            # 这样，无论哪一步出错，都能被捕获
+
+            rate = get_stars(p.score)
+            
+            authors = [a.name for a in p.authors[:5]]
+            authors = ', '.join(authors)
+            if len(p.authors) > 5:
+                authors += ', ...'
+            
+            # 这一行就是最开始出错的地方，现在它被 try...except 保护起来了
+            if p.affiliations is not None:
+                affiliations = p.affiliations[:5]
+                affiliations = ', '.join(affiliations)
+                if len(p.affiliations) > 5:
+                    affiliations += ', ...'
+            else:
+                affiliations = 'Unknown Affiliation'
+            
+            # 将成功处理的论文信息添加到 parts 列表中
+            parts.append(get_block_html(p.title, authors, rate, p.arxiv_id, p.tldr, p.pdf_url, p.code_url, affiliations))
+
+        except Exception as e:
+            # 使用一个更通用的 Exception 来捕获所有可能的错误，而不仅仅是 AttributeError
+            # 这样代码更健壮
+            
+            # 尝试获取论文ID用于打印日志，如果连ID都获取不到，就给一个默认提示
+            try:
+                paper_id = p.arxiv_id
+            except AttributeError:
+                paper_id = "未知ID的论文"
+                
+            print(f"\n[警告] 跳过论文 {paper_id}，因为它在处理过程中导致了一个错误: {e}\n")
+            continue  # 跳过这篇有问题的论文，继续处理下一篇
+
+    if not parts:
+        print("所有论文在处理时都出错或被跳过，生成一封空邮件。")
+        return framework.replace('__CONTENT__', get_empty_html())
 
     content = '<br>' + '</br><br>'.join(parts) + '</br>'
     return framework.replace('__CONTENT__', content)
+
+# --- 替换结束 ---
 
 def send_email(sender:str, receiver:str, password:str,smtp_server:str,smtp_port:int, html:str,):
     def _format_addr(s):
