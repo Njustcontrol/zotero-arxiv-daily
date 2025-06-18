@@ -117,41 +117,29 @@ def get_stars(score:float):
         return '<div class="star-wrapper">'+full_star * full_star_num + half_star * half_star_num + '</div>'
 
 
-# 在 construct_email.py 文件中
-
-def render_email(papers):
-    # ... 可能有一些准备代码 ...
+def render_email(papers:list[ArxivPaper]):
+    parts = []
+    if len(papers) == 0 :
+        return framework.replace('__CONTENT__', get_empty_html())
     
-    processed_papers = []
-    for p in tqdm(papers, desc="Rendering Email"):
-        # --- 开始修改 ---
-        try:
-            # 打印正在处理的论文ID，方便调试
-            print(f"正在处理论文: {p.entry_id}") 
-        
-            # 把原来循环里的所有逻辑都放到 try 块里面，并保持缩进
-            if p.affiliations is not None:
-                # 这里是处理单篇论文的逻辑
-                paper_info = {
-                    "title": p.title,
-                    "authors": p.authors,
-                    "affiliations": p.affiliations
-                    # ... 其他信息
-                }
-                processed_papers.append(paper_info)
-            # 如果还有其他处理逻辑，也放在这里
+    for p in tqdm(papers,desc='Rendering Email'):
+        rate = get_stars(p.score)
+        authors = [a.name for a in p.authors[:5]]
+        authors = ', '.join(authors)
+        if len(p.authors) > 5:
+            authors += ', ...'
+        if p.affiliations is not None:
+            affiliations = p.affiliations[:5]
+            affiliations = ', '.join(affiliations)
+            if len(p.affiliations) > 5:
+                affiliations += ', ...'
+        else:
+            affiliations = 'Unknown Affiliation'
+        parts.append(get_block_html(p.title, authors,rate,p.arxiv_id ,p.tldr, p.pdf_url, p.code_url, affiliations))
 
-        except AttributeError as e:
-            # 如果 try 块中的代码出现 AttributeError 错误，就会执行这里
-            # 打印错误信息，并跳过这篇有问题的论文，继续处理下一篇
-            print(f"跳过论文 {p.entry_id}，因为它导致了一个错误: {e}")
-            continue
-        # --- 结束修改 ---
+    content = '<br>' + '</br><br>'.join(parts) + '</br>'
+    return framework.replace('__CONTENT__', content)
 
-    # ... 使用 processed_papers 来生成最终的HTML（这部分代码不变） ...
-    
-    return final_html
-  
 def send_email(sender:str, receiver:str, password:str,smtp_server:str,smtp_port:int, html:str,):
     def _format_addr(s):
         name, addr = parseaddr(s)
